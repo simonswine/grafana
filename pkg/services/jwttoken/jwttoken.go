@@ -2,15 +2,15 @@ package jwttoken
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/services/sqlstore"
@@ -51,13 +51,23 @@ func (i *JWTTokenImpl) Init() error {
 }
 
 func New() (*JWTToken, error) {
-	ecdsaPrivateKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	algorithm := jose.RS256
+
+	rsaPrivateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		return nil, err
 	}
 
+	keyID := uuid.New().String()
+	use := "sig"
+
 	// Instantiate a signer using ECDSA with SHA-384.
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES384, Key: ecdsaPrivateKey}, nil)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: algorithm, Key: rsaPrivateKey}, &jose.SignerOptions{
+		ExtraHeaders: map[jose.HeaderKey]interface{}{
+			"kid": keyID,
+			"typ": "JWT",
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +75,16 @@ func New() (*JWTToken, error) {
 	return &JWTToken{
 		keys: Keys{
 			SigningKey: &jose.JSONWebKey{
-				Key: ecdsaPrivateKey,
+				Key:       rsaPrivateKey,
+				KeyID:     keyID,
+				Use:       use,
+				Algorithm: string(algorithm),
 			},
 			SigningKeyPub: &jose.JSONWebKey{
-				Key: ecdsaPrivateKey.Public(),
+				Key:       rsaPrivateKey.Public(),
+				KeyID:     keyID,
+				Use:       use,
+				Algorithm: string(algorithm),
 			},
 		},
 		signer: signer,
@@ -200,7 +216,12 @@ func (j *JWTToken) DataSourceAccessToken(ctx context.Context, ds *models.DataSou
 		return "", err
 	}
 
-	return signature.CompactSerialize()
+	token, err := signature.CompactSerialize()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s:%s", user.Login, token), nil
 }
 
 // IsOAuthPassThruEnabled returns true if Forward OAuth Identity (oauthPassThru) is enabled for the provided data source.
