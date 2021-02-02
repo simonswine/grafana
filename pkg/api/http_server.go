@@ -33,6 +33,7 @@ import (
 	"github.com/grafana/grafana/pkg/services/contexthandler"
 	"github.com/grafana/grafana/pkg/services/datasources"
 	"github.com/grafana/grafana/pkg/services/hooks"
+	"github.com/grafana/grafana/pkg/services/jwttoken"
 	"github.com/grafana/grafana/pkg/services/librarypanels"
 	"github.com/grafana/grafana/pkg/services/login"
 	"github.com/grafana/grafana/pkg/services/provisioning"
@@ -67,6 +68,7 @@ type HTTPServer struct {
 	HooksService         *hooks.HooksService                `inject:""`
 	CacheService         *localcache.CacheService           `inject:""`
 	DatasourceCache      datasources.CacheService           `inject:""`
+	JWTTokenService      jwttoken.Service                   `inject:""`
 	AuthTokenService     models.UserTokenService            `inject:""`
 	QuotaService         *quota.QuotaService                `inject:""`
 	RemoteCacheService   *remotecache.RemoteCache           `inject:""`
@@ -339,6 +341,7 @@ func (hs *HTTPServer) addMiddlewaresAndStaticRoutes() {
 	m.Use(hs.healthzHandler)
 	m.Use(hs.apiHealthHandler)
 	m.Use(hs.metricsEndpoint)
+	m.Use(hs.jwtKeys)
 
 	m.Use(hs.ContextHandler.Middleware)
 	m.Use(middleware.OrgRedirect(hs.Cfg))
@@ -387,6 +390,15 @@ func (hs *HTTPServer) healthzHandler(ctx *macaron.Context) {
 	if err != nil {
 		hs.log.Error("could not write to response", "err", err)
 	}
+}
+
+func (hs *HTTPServer) jwtKeys(ctx *macaron.Context) {
+	notHeadOrGet := ctx.Req.Method != http.MethodGet && ctx.Req.Method != http.MethodHead
+	if notHeadOrGet || ctx.Req.URL.Path != "/api/v1/keys" {
+		return
+	}
+
+	hs.JWTTokenService.HandlePublicKeys(ctx.Resp, ctx.Req.Request)
 }
 
 // apiHealthHandler will return ok if Grafana's web server is running and it

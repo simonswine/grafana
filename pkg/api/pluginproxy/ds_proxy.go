@@ -17,6 +17,7 @@ import (
 	glog "github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/plugins"
+	"github.com/grafana/grafana/pkg/services/jwttoken"
 	"github.com/grafana/grafana/pkg/services/oauthtoken"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/util"
@@ -37,6 +38,7 @@ type DataSourceProxy struct {
 	route     *plugins.AppPluginRoute
 	plugin    *plugins.DataSourcePlugin
 	cfg       *setting.Cfg
+	jwtToken  jwttoken.Service
 }
 
 type handleResponseTransport struct {
@@ -69,7 +71,7 @@ func (lw *logWrapper) Write(p []byte) (n int, err error) {
 
 // NewDataSourceProxy creates a new Datasource proxy
 func NewDataSourceProxy(ds *models.DataSource, plugin *plugins.DataSourcePlugin, ctx *models.ReqContext,
-	proxyPath string, cfg *setting.Cfg) (*DataSourceProxy, error) {
+	proxyPath string, cfg *setting.Cfg, jwtTokenService jwttoken.Service) (*DataSourceProxy, error) {
 	targetURL, err := datasource.ValidateURL(ds.Type, ds.Url)
 	if err != nil {
 		return nil, err
@@ -82,6 +84,7 @@ func NewDataSourceProxy(ds *models.DataSource, plugin *plugins.DataSourcePlugin,
 		proxyPath: proxyPath,
 		targetUrl: targetURL,
 		cfg:       cfg,
+		jwtToken:  jwtTokenService,
 	}, nil
 }
 
@@ -229,6 +232,14 @@ func (proxy *DataSourceProxy) director(req *http.Request) {
 	if oauthtoken.IsOAuthPassThruEnabled(proxy.ds) {
 		if token := oauthtoken.GetCurrentOAuthToken(proxy.ctx.Req.Context(), proxy.ctx.SignedInUser); token != nil {
 			req.Header.Set("Authorization", fmt.Sprintf("%s %s", token.Type(), token.AccessToken))
+		}
+	}
+
+	if jwttoken.IsEnabled(proxy.ds) {
+		token, err := proxy.jwtToken.DataSourceAccessToken(proxy.ctx.Req.Context(), proxy.ds, proxy.ctx.SignedInUser)
+		if err != nil {
+		} else {
+			req.Header.Set("Authorization", fmt.Sprintf("%s %s", "Bearer", token))
 		}
 	}
 }
