@@ -1,14 +1,17 @@
 import { css } from '@emotion/css';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReactZoomPanPinchRef, TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { useStyles2 } from '@grafana/ui';
+import { contextSrv } from 'app/core/services/context_srv';
 import { useDispatch, useSelector } from 'app/types/store';
 
 import { useTransformContext } from '../context/TransformContext';
+import { useExploreMapLive } from '../hooks/useExploreMapLive';
 import { useMockCursors } from '../hooks/useMockCursors';
-import { selectMultiplePanels, selectPanel, updateViewport } from '../state/exploreMapSlice';
+import { selectMultiplePanels, selectPanel, updateCursor, updateViewport } from '../state/exploreMapSlice';
+import { getOrGenerateUserColor } from '../utils/userColor';
 
 import { ExploreMapPanelContainer } from './ExploreMapPanelContainer';
 import { UserCursor } from './UserCursor';
@@ -24,7 +27,8 @@ export function ExploreMapCanvas() {
   const styles = useStyles2(getStyles);
   const dispatch = useDispatch();
   const canvasRef = useRef<HTMLDivElement>(null);
-  const { transformRef: contextTransformRef } = useTransformContext();
+  const transformContext = useTransformContext();
+  const { transformRef: contextTransformRef } = transformContext;
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const justCompletedSelectionRef = useRef(false);
@@ -33,8 +37,33 @@ export function ExploreMapCanvas() {
   const viewport = useSelector((state) => state.exploreMap.viewport);
   const cursors = useSelector((state) => state.exploreMap.cursors);
 
-  // Initialize mock cursors
-  useMockCursors();
+  // Get current user info
+  const currentUser = contextSrv.user;
+  const currentUserId = currentUser.id.toString();
+  const currentUserName = currentUser.name || currentUser.login;
+  const userColorRef = useRef(getOrGenerateUserColor());
+
+  // Enable WebSocket for real-time cursor updates (set to false to use mock cursors)
+  const useWebSocket = true;
+
+  // Initialize mock cursors (only when WebSocket is disabled)
+  // useMockCursors(); // Disabled - using real WebSocket cursors
+
+  // Initialize WebSocket connection
+  const { publishCursorUpdate, publishLeave } = useExploreMapLive({
+    currentUserId,
+    currentUserName,
+    enabled: useWebSocket,
+  });
+
+  // Cleanup on unmount - notify others we're leaving
+  useEffect(() => {
+    return () => {
+      if (useWebSocket) {
+        publishLeave();
+      }
+    };
+  }, [useWebSocket, publishLeave]);
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
@@ -80,20 +109,26 @@ export function ExploreMapCanvas() {
 
   const handleCanvasMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isSelecting || !selectionRect) {
-        return;
-      }
-
       const canvasX = e.nativeEvent.offsetX;
       const canvasY = e.nativeEvent.offsetY;
 
-      setSelectionRect({
-        ...selectionRect,
-        currentX: canvasX,
-        currentY: canvasY,
-      });
+      // Publish cursor position to WebSocket
+      // Note: We don't update local state - only remote cursors are shown
+      // The WebSocket handler filters out our own sessionId, so we never see our own cursor
+      if (useWebSocket) {
+        publishCursorUpdate(canvasX, canvasY, userColorRef.current);
+      }
+
+      // Handle selection rectangle
+      if (isSelecting && selectionRect) {
+        setSelectionRect({
+          ...selectionRect,
+          currentX: canvasX,
+          currentY: canvasY,
+        });
+      }
     },
-    [isSelecting, selectionRect]
+    [isSelecting, selectionRect, useWebSocket, publishCursorUpdate]
   );
 
   const handleCanvasMouseUp = useCallback(

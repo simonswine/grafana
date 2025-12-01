@@ -16,13 +16,16 @@ interface MockUser {
   pauseUntil: number;
 }
 
-const ENABLE_MOCK_USERS = false;
+const ENABLE_MOCK_USERS = false; // Disabled - using real WebSocket cursors
 
-let MOCK_USERS: Array<Omit<MockUser, 'targetX' | 'targetY' | 'currentX' | 'currentY' | 'pauseUntil'>> = ENABLE_MOCK_USERS ? [
-  { userId: 'mock-1', userName: 'Christian', color: '#FF6B6B', speed: 8 },
-  { userId: 'mock-2', userName: 'Ryan', color: '#4ECDC4', speed: 6 },
-  { userId: 'mock-3', userName: 'Marc', color: '#45B7D1', speed: 10 },
-] : [];
+let MOCK_USERS: Array<Omit<MockUser, 'targetX' | 'targetY' | 'currentX' | 'currentY' | 'pauseUntil'>> =
+  ENABLE_MOCK_USERS
+    ? [
+        { userId: 'mock-1', userName: 'Christian', color: '#FF6B6B', speed: 8 },
+        { userId: 'mock-2', userName: 'Ryan', color: '#4ECDC4', speed: 6 },
+        { userId: 'mock-3', userName: 'Marc', color: '#45B7D1', speed: 10 },
+      ]
+    : [];
 
 // Constrain cursors to upper left area of canvas
 const MOVEMENT_AREA = {

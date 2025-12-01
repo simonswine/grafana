@@ -1,5 +1,5 @@
 import { css } from '@emotion/css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom-v5-compat';
 import { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 
@@ -22,6 +22,8 @@ export default function ExploreMapPage(props: GrafanaRouteComponentProps<{ uid?:
   const navModel = useNavModel('explore-map');
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
   const { uid } = useParams<{ uid?: string }>();
+  // TODO: Connect isLiveConnected to actual WebSocket connection state
+  const isLiveConnected = false;
 
   // Initialize canvas persistence (with uid if available)
   const { loading } = useCanvasPersistence({ uid });
@@ -40,14 +42,17 @@ export default function ExploreMapPage(props: GrafanaRouteComponentProps<{ uid?:
     );
   }
 
+  // Show live status indicator for real-time cursor collaboration
+  const showLiveStatus = true;
+
   return (
     <ErrorBoundaryAlert>
-      <TransformProvider value={{ transformRef }}>
+      <TransformProvider value={{ transformRef, isLiveConnected, showLiveStatus }}>
         <div className={styles.pageWrapper}>
           <h1 className="sr-only">
             <Trans i18nKey="nav.explore-map.title">Explore Map</Trans>
           </h1>
-          <ExploreMapToolbar uid={uid} />
+          <ExploreMapToolbar uid={uid} isLiveConnected={isLiveConnected} showLiveStatus={showLiveStatus} />
           <ExploreMapCanvas />
           <ExploreMapFloatingToolbar />
         </div>

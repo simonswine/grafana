@@ -12,9 +12,11 @@ import { resetCanvas, updateMapTitle } from '../state/exploreMapSlice';
 
 interface ExploreMapToolbarProps {
   uid?: string;
+  isLiveConnected?: boolean;
+  showLiveStatus?: boolean;
 }
 
-export function ExploreMapToolbar({ uid }: ExploreMapToolbarProps) {
+export function ExploreMapToolbar({ uid, isLiveConnected = false, showLiveStatus = false }: ExploreMapToolbarProps) {
   const styles = useStyles2(getStyles);
   const dispatch = useDispatch();
   const { exportCanvas, importCanvas, saving, lastSaved } = useCanvasPersistence({ uid });
@@ -27,6 +29,8 @@ export function ExploreMapToolbar({ uid }: ExploreMapToolbarProps) {
   const panelCount = useSelector((state) => Object.keys(state.exploreMap.panels).length);
   const viewport = useSelector((state) => state.exploreMap.viewport);
   const mapTitle = useSelector((state) => state.exploreMap.title);
+  const cursors = useSelector((state) => state.exploreMap.cursors);
+  const activeUsers = Object.keys(cursors).length;
 
   useEffect(() => {
     if (mapTitle) {
@@ -165,6 +169,14 @@ export function ExploreMapToolbar({ uid }: ExploreMapToolbarProps) {
             </span>
           )}
           {getSaveStatus()}
+          {showLiveStatus && (
+            <div className={styles.liveStatus}>
+              <span className={isLiveConnected ? styles.liveIndicatorConnected : styles.liveIndicatorDisconnected} />
+              <span className={styles.liveText}>
+                {isLiveConnected ? `Live (${activeUsers} ${activeUsers === 1 ? 'user' : 'users'})` : 'Not connected'}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className={styles.toolbarSection}>
@@ -272,6 +284,40 @@ const getStyles = (theme: GrafanaTheme2) => {
       fontSize: theme.typography.bodySmall.fontSize,
       color: theme.colors.text.secondary,
       fontStyle: 'italic',
+    }),
+    liveStatus: css({
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing(0.5),
+      fontSize: theme.typography.bodySmall.fontSize,
+      color: theme.colors.text.secondary,
+      padding: theme.spacing(0.5, 1),
+      borderRadius: theme.shape.radius.default,
+      backgroundColor: theme.colors.background.primary,
+    }),
+    liveIndicatorConnected: css({
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      backgroundColor: theme.colors.success.main,
+      animation: 'pulse 2s ease-in-out infinite',
+      '@keyframes pulse': {
+        '0%, 100%': {
+          opacity: 1,
+        },
+        '50%': {
+          opacity: 0.5,
+        },
+      },
+    }),
+    liveIndicatorDisconnected: css({
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      backgroundColor: theme.colors.text.disabled,
+    }),
+    liveText: css({
+      fontSize: theme.typography.bodySmall.fontSize,
     }),
   };
 };

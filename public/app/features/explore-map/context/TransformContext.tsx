@@ -3,6 +3,8 @@ import { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 
 interface TransformContextType {
   transformRef: React.RefObject<ReactZoomPanPinchRef> | null;
+  isLiveConnected?: boolean;
+  showLiveStatus?: boolean;
 }
 
 const TransformContext = createContext<TransformContextType>({ transformRef: null });

@@ -194,6 +194,7 @@ func ProvideService(plugCtxProvider *plugincontext.Provider, cfg *setting.Cfg, r
 	g.GrafanaScope.Dashboards = dash
 	g.GrafanaScope.Features["dashboard"] = dash
 	g.GrafanaScope.Features["broadcast"] = features.NewBroadcastRunner(g.storage)
+	g.GrafanaScope.Features["explore-map"] = features.NewExploreMapHandler()
 
 	// Testing watch with just the provisioning support -- this will be removed when it is well validated
 	//nolint:staticcheck // not yet migrated to OpenFeature
